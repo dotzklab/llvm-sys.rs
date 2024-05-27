@@ -218,7 +218,22 @@ fn llvm_config_ex<'a, S: AsRef<OsStr>>(
     binary: S,
     args: impl Iterator<Item = &'a str>,
 ) -> io::Result<String> {
-    Command::new(binary).args(args).output().and_then(|output| {
+    let mut cmd = if env::var("HOST") != env::var("TARGET") {
+        let qemu = env::var("QEMU").expect("Variable QEMU is expected when target and host is different");
+        let sysroot = env::var("QEMU_SYSROOT").expect("Variable QEMU_SYSROOT of qemu is expected when target and host is different");
+        let mut cmd = Command::new(qemu.as_str());
+        cmd
+            .arg("-L")
+            .arg(sysroot.as_str())
+            .arg(binary)
+            .args(args);
+        cmd
+    } else {
+        let mut cmd = Command::new(binary);
+        cmd.args(args);
+        cmd
+    };
+    cmd.output().and_then(|output| {
         if output.status.code() != Some(0) {
             Err(io::Error::new(
                 io::ErrorKind::Other,
